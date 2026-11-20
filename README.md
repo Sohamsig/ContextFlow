@@ -1,4 +1,4 @@
-﻿# ContextFlow
+# ContextFlow
 
 **Open-source enterprise context infrastructure for AI applications.**
 
@@ -265,3 +265,20 @@ Please open an issue before making significant architectural changes.
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
+## Database Migration Workflow
+
+```mermaid
+flowchart TD
+    A([Start API]) --> B[Create schema_migrations]
+    B --> C[Read migration files]
+    C --> D[Sort migration files]
+    D --> E{Version already applied?}
+    E -->|Yes| F[Skip migration]
+    E -->|No| G[Begin transaction]
+    G --> H[Execute SQL]
+    H --> I[Record version]
+    I --> J[Commit]
+    F --> K([Continue startup])
+    J --> K
+```

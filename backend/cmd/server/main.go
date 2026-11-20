@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"github.com/Sohamsig/ContextFlow/backend/internal/sources"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/Sohamsig/ContextFlow/backend/internal/config"
 	"github.com/Sohamsig/ContextFlow/backend/internal/database"
+	"github.com/Sohamsig/ContextFlow/backend/internal/records"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -36,9 +38,24 @@ func main() {
 	}
 	defer pool.Close()
 
+	migrationCtx, migrationCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer migrationCancel()
+
+	if err := database.RunMigrations(migrationCtx, pool, "migrations"); err != nil {
+		log.Fatalf("run database migrations: %v", err)
+	}
+
+	log.Println("Database migrations completed successfully")
+
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
+	sourceRepository := sources.NewRepository(pool)
+	sourceHandler := sources.NewHandler(sourceRepository)
+	sourceHandler.RegisterRoutes(router)
+	recordRepository := records.NewRepository(pool)
+	recordHandler := records.NewHandler(recordRepository)
+	recordHandler.RegisterRoutes(router)
 
 	router.Get("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -64,9 +81,9 @@ func main() {
 		json.NewEncoder(w).Encode(response)
 	})
 
-	log.Println("ContextFlow API starting on :8080")
+	log.Println("ContextFlow API starting on :8081")
 
-	if err := http.ListenAndServe(":8080", router); err != nil {
+	if err := http.ListenAndServe(":8081", router); err != nil {
 		log.Fatal(err)
 	}
 }
